@@ -31,23 +31,7 @@ while True:
         print("Database Connection Failed!")
         print("Error :",e)
         time.sleep(3)
-
-my_posts = [{
-    "title": "Post 1",
-    "content": "This is post 1",
-    "id": 1
-},{
-    "title": "Post 2",
-    "content": "This is post 2",
-    "id": 2
-}]
-
-
-
-def find_index_post(id):
-    for i,p in enumerate(my_posts):
-        if p['id']==id:
-            return i
+        
 
 @app.get("/")
 def root():
