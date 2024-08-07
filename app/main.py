@@ -1,10 +1,9 @@
 from fastapi import Body, FastAPI,Response,status,HTTPException,Depends
-from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
 from sqlalchemy.orm import Session
-from . import models
+from . import models,schemas 
 from .database import engine,get_db
 
 models.Base.metadata.create_all(bind=engine)
@@ -13,12 +12,6 @@ models.Base.metadata.create_all(bind=engine)
 app=FastAPI()
 
 
-
-
-class Post(BaseModel):
-    title: str
-    content: str
-    published: bool = True
 
 # Path Operation 
 
@@ -43,32 +36,33 @@ while True:
 def root():
     return "Hello World"
 
-
-
-@app.get("/sqlalchemy")
-def test_posts( db: Session = Depends(get_db)):
-    return{"status":'success'}
-
-
 @app.get("/posts")
-def get_posts():
-    cur.execute("""SELECT * FROM posts""")
-    records = cur.fetchall()
-    return records
+def get_posts(db: Session = Depends(get_db)):
+    # cur.execute("""SELECT * FROM posts""")
+    # records = cur.fetchall()
+    posts=db.query(models.Post).all()
+    return {"data":posts}
 
 
 @app.post("/posts",status_code=status.HTTP_201_CREATED)
-def create_posts(post:Post):
+def create_posts(post:schemas.PostCreate,db: Session = Depends(get_db)):
     
-    cur.execute("""insert into posts (title,content,published) values (%s,%s,%s) returning * """,(post.title,post.content,post.published))
-    new_post=cur.fetchone()
-    conn.commit()
+    # cur.execute("""insert into posts (title,content,published) values (%s,%s,%s) returning * """,(post.title,post.content,post.published))
+    # new_post=cur.fetchone()
+    # conn.commit()
+
+    new_post=models.Post(**post.model_dump())
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post) 
+
     return {"post Created ":new_post}
 
 @app.get("/posts/{id}")
-def get_posts(id:int):
-    cur.execute("""SELECT * FROM posts where id = %s """,(str(id),))
-    post = cur.fetchone()
+def get_posts(id:int,db: Session = Depends(get_db)):
+    # cur.execute("""SELECT * FROM posts where id = %s """,(str(id),))
+    # post = cur.fetchone()
+    post=db.query(models.Post).filter(models.Post.id == id).first()
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
                             detail=f"post with id {id} not found")
@@ -76,27 +70,37 @@ def get_posts(id:int):
 
 
 @app.delete("/posts/{id}",status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id: int):
+def delete_post(id: int,db: Session = Depends(get_db)):
 
-    cur.execute("""delete from posts where id = %s returning * """,(str(id),))
-    deleted_post=cur.fetchone()
-    conn.commit()
+    # cur.execute("""delete from posts where id = %s returning * """,(str(id),))
+    # deleted_post=cur.fetchone()
+    # conn.commit()
 
-    if deleted_post == None:
+    post=db.query(models.Post).filter(models.Post.id == id)
+    if post.first() == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"post with id {id} not found")
+    
+    post.delete(synchronize_session=False)
+    db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
     
 @app.put("/posts/{id}")
 
-def update_posts(id:int,post:Post):
+def update_posts(id:int,updated_post:schemas.PostCreate,db: Session = Depends(get_db)):
 
-    cur.execute("""update posts set title= %s,content= %s,published=%s where id = %s returning *""",(post.title,post.content,post.published,str(id)))
-    updated_post=cur.fetchone()
-    conn.commit()
-
-    if updated_post == None:
+    # cur.execute("""update posts set title= %s,content= %s,published=%s where id = %s returning *""",(post.title,post.content,post.published,str(id)))
+    # updated_post=cur.fetchone()
+    # conn.commit()
+    post_query=db.query(models.Post).filter(models.Post.id == id)
+    post=post_query.first()
+    if post == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                         detail=f"post with id {id} not found")
     
-    return {"post_details":updated_post}
+    post_query.update(updated_post.model_dump(),synchronize_session=False)
+    db.commit()
+    
+    return {"post_details":post_query.first()}
