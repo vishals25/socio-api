@@ -3,35 +3,13 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
 from sqlalchemy.orm import Session
-from . import models,schemas 
+from . import models,schemas,utils
 from .database import engine,get_db
 from typing import List
 
 models.Base.metadata.create_all(bind=engine)
 
-
 app=FastAPI()
-
-
-
-# Path Operation 
-
-while True:
-    try:
-        # Connect to your postgres DB
-        conn = psycopg2.connect(host='localhost',database='fastapi',user='postgres',password='vishal',cursor_factory=RealDictCursor,)
-
-        # Open a cursor to perform database operations
-        cur = conn.cursor()
-        print("Database Connection Successfull!")
-
-        break
-
-    except Exception as e:
-        print("Database Connection Failed!")
-        print("Error :",e)
-        time.sleep(3)
-        
 
 @app.get("/")
 def root():
@@ -39,18 +17,13 @@ def root():
 
 @app.get("/posts",response_model=List[schemas.Post])
 def get_posts(db: Session = Depends(get_db)):
-    # cur.execute("""SELECT * FROM posts""")
-    # records = cur.fetchall()
+
     posts=db.query(models.Post).all()
     return posts
 
 
 @app.post("/posts",status_code=status.HTTP_201_CREATED,response_model=schemas.Post)
 def create_posts(post:schemas.PostCreate,db: Session = Depends(get_db)):
-    
-    # cur.execute("""insert into posts (title,content,published) values (%s,%s,%s) returning * """,(post.title,post.content,post.published))
-    # new_post=cur.fetchone()
-    # conn.commit()
 
     new_post=models.Post(**post.model_dump())
     db.add(new_post)
@@ -61,8 +34,7 @@ def create_posts(post:schemas.PostCreate,db: Session = Depends(get_db)):
 
 @app.get("/posts/{id}",response_model=schemas.Post)
 def get_posts(id:int,db: Session = Depends(get_db)):
-    # cur.execute("""SELECT * FROM posts where id = %s """,(str(id),))
-    # post = cur.fetchone()
+
     post=db.query(models.Post).filter(models.Post.id == id).first()
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
@@ -72,10 +44,6 @@ def get_posts(id:int,db: Session = Depends(get_db)):
 
 @app.delete("/posts/{id}",status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id: int,db: Session = Depends(get_db)):
-
-    # cur.execute("""delete from posts where id = %s returning * """,(str(id),))
-    # deleted_post=cur.fetchone()
-    # conn.commit()
 
     post=db.query(models.Post).filter(models.Post.id == id)
     if post.first() == None:
@@ -92,9 +60,6 @@ def delete_post(id: int,db: Session = Depends(get_db)):
 
 def update_posts(id:int,updated_post:schemas.PostCreate,db: Session = Depends(get_db)):
 
-    # cur.execute("""update posts set title= %s,content= %s,published=%s where id = %s returning *""",(post.title,post.content,post.published,str(id)))
-    # updated_post=cur.fetchone()
-    # conn.commit()
     post_query=db.query(models.Post).filter(models.Post.id == id)
     post=post_query.first()
     if post == None:
@@ -105,3 +70,28 @@ def update_posts(id:int,updated_post:schemas.PostCreate,db: Session = Depends(ge
     db.commit()
     
     return post_query.first()
+
+@app.post("/users",status_code=status.HTTP_201_CREATED,response_model=schemas.UserOut)
+
+def create_user(user : schemas.UserCreate,db: Session = Depends(get_db)):
+
+    #hash the password
+
+    hashed_password=utils.hash(user.password)
+    user.password=hashed_password
+
+    new_user=models.User(**user.model_dump())
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user) 
+
+    return new_user
+
+@app.get("/users/{id}",response_model=schemas.UserOut)
+
+def get_user(id:int,db: Session = Depends(get_db)):
+    user=db.query(models.User).filter(models.User.id==id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail=f"user with id : {id} not found !")
+    return user
