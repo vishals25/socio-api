@@ -5,6 +5,7 @@ import time
 from sqlalchemy.orm import Session
 from . import models,schemas 
 from .database import engine,get_db
+from typing import List
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -36,15 +37,15 @@ while True:
 def root():
     return "Hello World"
 
-@app.get("/posts")
+@app.get("/posts",response_model=List[schemas.Post])
 def get_posts(db: Session = Depends(get_db)):
     # cur.execute("""SELECT * FROM posts""")
     # records = cur.fetchall()
     posts=db.query(models.Post).all()
-    return {"data":posts}
+    return posts
 
 
-@app.post("/posts",status_code=status.HTTP_201_CREATED)
+@app.post("/posts",status_code=status.HTTP_201_CREATED,response_model=schemas.Post)
 def create_posts(post:schemas.PostCreate,db: Session = Depends(get_db)):
     
     # cur.execute("""insert into posts (title,content,published) values (%s,%s,%s) returning * """,(post.title,post.content,post.published))
@@ -56,9 +57,9 @@ def create_posts(post:schemas.PostCreate,db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_post) 
 
-    return {"post Created ":new_post}
+    return new_post
 
-@app.get("/posts/{id}")
+@app.get("/posts/{id}",response_model=schemas.Post)
 def get_posts(id:int,db: Session = Depends(get_db)):
     # cur.execute("""SELECT * FROM posts where id = %s """,(str(id),))
     # post = cur.fetchone()
@@ -87,7 +88,7 @@ def delete_post(id: int,db: Session = Depends(get_db)):
 
 
     
-@app.put("/posts/{id}")
+@app.put("/posts/{id}",response_model=schemas.Post)
 
 def update_posts(id:int,updated_post:schemas.PostCreate,db: Session = Depends(get_db)):
 
@@ -103,4 +104,4 @@ def update_posts(id:int,updated_post:schemas.PostCreate,db: Session = Depends(ge
     post_query.update(updated_post.model_dump(),synchronize_session=False)
     db.commit()
     
-    return {"post_details":post_query.first()}
+    return post_query.first()
