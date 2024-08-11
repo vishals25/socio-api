@@ -12,6 +12,7 @@ class PostCreate(PostBase):
 
 class Post(PostBase):
     id:int
+    owner_id:int
     created_at: datetime
 
 class UserCreate(BaseModel):
