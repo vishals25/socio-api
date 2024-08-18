@@ -51,8 +51,4 @@ After modifying the SQLAlchemy models, create a new migration with Alembic and a
 
 Run tests using `pytest`.
 
-
 ![image](https://github.com/user-attachments/assets/6aec8f0d-b345-4d55-9f8c-a40643915b80)
-
-
-
